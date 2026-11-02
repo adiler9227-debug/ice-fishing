@@ -16,6 +16,14 @@ const DATA = pickDataDir();
 const PLAYERS = path.join(DATA, 'players');
 fs.mkdirSync(PLAYERS, { recursive: true });
 const CODES_FILE = path.join(DATA, 'codes.json');
+const NAMES_FILE = path.join(DATA, 'names.json');
+let names = {}; // имя (в нижнем регистре) -> { id, salt, hash }
+try { names = JSON.parse(fs.readFileSync(NAMES_FILE, 'utf8')); } catch (e) { names = {}; }
+function saveNames() { writeAtomic(NAMES_FILE, JSON.stringify(names)); }
+const nameKey = n => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
+const cleanName = n => String(n || '').trim().replace(/\s+/g, ' ').slice(0, 20);
+const pinHash = (salt, pin) => crypto.createHash('sha256').update(salt + ':' + pin).digest('hex');
+const fails = new Map(); // имя -> [время неудачных попыток]
 
 // ---------- хранилище ----------
 let codes = {}; // код игрока -> id
@@ -73,7 +81,7 @@ const server = http.createServer((q, r) => {
     if (p === '/api/load' && q.method === 'GET') {
       const id = url.searchParams.get('id'); const pl = readPlayer(id);
       if (!pl) return sendJSON(r, 404, { error: 'not found' });
-      return sendJSON(r, 200, { id, code: pl.code, save: pl.save, t: pl.t });
+      return sendJSON(r, 200, { id, code: pl.code, name: pl.name || null, save: pl.save, t: pl.t });
     }
     if (p === '/api/save' && q.method === 'POST') {
       return readBody(q, 256 * 1024, (e, b) => {
@@ -90,6 +98,32 @@ const server = http.createServer((q, r) => {
         const id = codes[code]; const pl = id && readPlayer(id);
         if (!pl) return sendJSON(r, 404, { error: 'not found' });
         sendJSON(r, 200, { id, code: pl.code, save: pl.save, t: pl.t });
+      });
+    }
+    if (p === '/api/claim' && q.method === 'POST') { // привязать имя + PIN к игроку
+      return readBody(q, 2048, (e, b) => {
+        if (e || !b || !validId(b.id)) return sendJSON(r, 400, { error: 'bad request' });
+        const name = cleanName(b.name), key = nameKey(name), pin = String(b.pin || '');
+        if (name.length < 2) return sendJSON(r, 400, { error: 'name' });
+        if (!/^[0-9]{4}$/.test(pin)) return sendJSON(r, 400, { error: 'pin' });
+        const pl = readPlayer(b.id); if (!pl) return sendJSON(r, 404, { error: 'not found' });
+        if (names[key] && names[key].id !== b.id) return sendJSON(r, 409, { error: 'taken' });
+        if (pl.name && nameKey(pl.name) !== key && names[nameKey(pl.name)] && names[nameKey(pl.name)].id === b.id) delete names[nameKey(pl.name)];
+        const salt = crypto.randomBytes(8).toString('hex');
+        names[key] = { id: b.id, salt, hash: pinHash(salt, pin) }; saveNames();
+        pl.name = name; writePlayer(b.id, pl);
+        sendJSON(r, 200, { ok: true, name });
+      });
+    }
+    if (p === '/api/login' && q.method === 'POST') { // войти по имени + PIN
+      if (limited(ip + ':login', 12)) return sendJSON(r, 429, { error: 'slow down' });
+      return readBody(q, 2048, (e, b) => {
+        const key = nameKey(b && b.name), pin = String((b && b.pin) || ''), rec = names[key];
+        const now = Date.now(), f = (fails.get(key) || []).filter(t => now - t < 3600000);
+        if (f.length >= 20) return sendJSON(r, 429, { error: 'locked' });
+        if (!rec || rec.hash !== pinHash(rec.salt, pin)) { f.push(now); fails.set(key, f); return sendJSON(r, 404, { error: 'not found' }); }
+        const pl = readPlayer(rec.id); if (!pl) return sendJSON(r, 404, { error: 'not found' });
+        sendJSON(r, 200, { id: rec.id, code: pl.code, name: pl.name, save: pl.save, t: pl.t });
       });
     }
     return sendJSON(r, 404, { error: 'unknown' });

@@ -72,9 +72,12 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block}
   <div class="row"><span>Продано</span><b id="stSold">0</b></div>
   <div class="row"><span>Сохранение</span><b id="stSave">—</b></div>
   <small id="saveHelp"></small>
-  <div id="codeBox" hidden style="text-align:center;margin:6px 0 4px"><div style="font-size:13px;color:#5d7690">Твой код игрока</div><div id="pcode" style="font-size:30px;font-weight:900;letter-spacing:3px;color:#1d3550">———</div></div>
-  <button id="mRestoreOpen" hidden>У меня есть код игрока</button>
-  <div id="restoreBox" hidden><input id="restoreTxt" placeholder="Например: ABC-DEF" maxlength="9" style="width:100%;padding:12px;border-radius:10px;border:2px solid #d5e2ee;font-size:20px;text-align:center;text-transform:uppercase;letter-spacing:2px;margin-top:8px"><button class="go" id="mRestore">Продолжить с этим кодом</button></div>
+  <div id="codeBox" hidden style="text-align:center;margin:6px 0 4px"><div id="whoLbl" style="font-size:13px;color:#5d7690">Ты играешь как</div><div id="pcode" style="font-size:28px;font-weight:900;color:#1d3550">———</div></div>
+  <button id="mClaimOpen" hidden>✏️ Придумать имя и 4 цифры</button>
+  <div id="claimBox" hidden><input id="claimName" placeholder="Имя, например Айгуль" maxlength="20" style="width:100%;padding:12px;border-radius:10px;border:2px solid #d5e2ee;font-size:19px;text-align:center;margin-top:8px"><input id="claimPin" placeholder="4 цифры" maxlength="4" inputmode="numeric" pattern="[0-9]*" style="width:100%;padding:12px;border-radius:10px;border:2px solid #d5e2ee;font-size:19px;text-align:center;margin-top:8px"><button class="go" id="mClaim">Сохранить</button></div>
+  <button id="mRestoreOpen" hidden>📱 Я уже играла на другом телефоне</button>
+  <div id="restoreBox" hidden><input id="loginName" placeholder="Твоё имя в игре" maxlength="20" style="width:100%;padding:12px;border-radius:10px;border:2px solid #d5e2ee;font-size:19px;text-align:center;margin-top:8px"><input id="loginPin" placeholder="4 цифры" maxlength="4" inputmode="numeric" pattern="[0-9]*" style="width:100%;padding:12px;border-radius:10px;border:2px solid #d5e2ee;font-size:19px;text-align:center;margin-top:8px"><button class="go" id="mLogin">Войти</button>
+    <small style="text-align:center">или по коду игрока:</small><input id="restoreTxt" placeholder="ABC-DEF" maxlength="9" style="width:100%;padding:12px;border-radius:10px;border:2px solid #d5e2ee;font-size:19px;text-align:center;margin-top:8px" style="text-transform:uppercase"><button id="mRestore">Войти по коду</button></div>
   <button id="mSnd">Звук: вкл</button>
   <button id="mExport">Скопировать код сохранения</button>
   <button id="mImportOpen">Загрузить код сохранения</button>
@@ -84,6 +87,12 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block}
   <button class="go" id="mClose">Играть</button>
 </div></div>
 
+<div class="modal" id="mName" hidden><div class="card" style="text-align:center">
+  <h2>Чтобы игра не потерялась 💾</h2>
+  <p>Придумай имя и 4 цифры. Если поменяешь телефон, просто введёшь их и продолжишь с того же места.</p>
+  <input id="nmName" placeholder="Имя, например Айгуль" maxlength="20" style="width:100%;padding:12px;border-radius:10px;border:2px solid #d5e2ee;font-size:19px;text-align:center;margin-top:8px"><input id="nmPin" placeholder="4 цифры" maxlength="4" inputmode="numeric" pattern="[0-9]*" style="width:100%;padding:12px;border-radius:10px;border:2px solid #d5e2ee;font-size:19px;text-align:center;margin-top:8px">
+  <button class="go" id="nmSave">Сохранить</button><button id="nmLater">Потом</button>
+</div></div>
 <div class="modal" id="mWin" hidden><div class="card" style="text-align:center">
   <h2>🎄 Поздравляем! 🎄</h2>
   <p>Ты построила самую большую рыбацкую деревню на озере! Рыбаки и конвейеры продолжают работать, а улучшения можно прокачивать дальше.</p>
@@ -783,7 +792,7 @@ function updateHUD(){ const m=Math.floor(S.money); if(m!==moneyShown){ moneyShow
 function setMuted(v){ muted=v; $('#bSnd').textContent=v?'🔇':'🔊'; $('#mSnd').textContent='Звук: '+(v?'выкл':'вкл'); try{ localStorage.setItem(KEY+'.mute', v?'1':'0'); }catch(e){} }
 $('#bSnd').onclick=()=>{ audioInit(); setMuted(!muted); };
 $('#mSnd').onclick=()=>{ audioInit(); setMuted(!muted); };
-function openMenu(){ $('#stLvl').textContent=$('#lvlnum').textContent; $('#stEarn').textContent=fmt(S.stats.earned); $('#stSold').textContent=fmt(S.stats.sold); $('#stSave').textContent=saveStatus(); $('#saveHelp').textContent=saveHelp(); $('#importBox').hidden=true; $('#resetBox').hidden=true; $('#codeBox').hidden=!SRV.on; $('#mRestoreOpen').hidden=!SRV.on; $('#restoreBox').hidden=true; $('#pcode').textContent=fmtCode(SRV.code); $('#mMenu').hidden=false; }
+function openMenu(){ $('#stLvl').textContent=$('#lvlnum').textContent; $('#stEarn').textContent=fmt(S.stats.earned); $('#stSold').textContent=fmt(S.stats.sold); $('#stSave').textContent=saveStatus(); $('#saveHelp').textContent=saveHelp(); $('#importBox').hidden=true; $('#resetBox').hidden=true; $('#mExport').hidden=SRV.on; $('#mImportOpen').hidden=SRV.on; $('#codeBox').hidden=!SRV.on; $('#mRestoreOpen').hidden=!SRV.on; $('#mClaimOpen').hidden=!SRV.on; $('#mClaimOpen').textContent=SRV.name?'✏️ Сменить имя или цифры':'✏️ Придумать имя и 4 цифры'; $('#restoreBox').hidden=true; $('#claimBox').hidden=true; $('#whoLbl').textContent=SRV.name?'Ты играешь как':'Твой код игрока'; $('#pcode').textContent=SRV.name?SRV.name:fmtCode(SRV.code); $('#mMenu').hidden=false; }
 $('#bMenu').onclick=openMenu; $('#bCloud').onclick=openMenu;
 $('#mClose').onclick=()=>{ $('#mMenu').hidden=true; };
 $('#mReset').onclick=()=>{ $('#resetBox').hidden=false; };
@@ -839,7 +848,7 @@ function saveNow(){
   try{ const prev=localStorage.getItem(KEY); if(prev && prev!==json) localStorage.setItem(KEY+'.bak', prev); localStorage.setItem(KEY, json); storageOK=true; }catch(e){ storageOK=false; }
   lastSaveJson=json; }
 function saveStatus(){ const a=storageOK?'✅ в браузере':'⚠️ браузер не сохраняет'; if(SRV.on) return a+(SRV.err?' · ⚠️ сервер недоступен':' и 🗄️ на сервере'); return cloudState==='on' ? a+' и ☁️ в аккаунте' : a; }
-function saveHelp(){ if(SRV.on) return 'Прогресс хранится на сервере. Если сменишь телефон или браузер, нажми «У меня есть код игрока» и введи этот код: игра продолжится с того же места. Код лучше записать.'; return cloudState==='on' ? 'Прогресс привязан к аккаунту Claude: можно играть с любого телефона, где открыт этот аккаунт.' : 'Сейчас прогресс хранится только в этом браузере. Чтобы привязать его к аккаунту, открой игру по ссылке, войдя в Claude. На всякий случай сохрани код сохранения кнопкой ниже.'; }
+function saveHelp(){ if(SRV.on) return SRV.name ? 'Прогресс хранится на сервере. На другом телефоне нажми «Я уже играла на другом телефоне» и введи своё имя и 4 цифры.' : 'Прогресс хранится на сервере. Придумай имя и 4 цифры, чтобы потом можно было продолжить на любом телефоне.'; return cloudState==='on' ? 'Прогресс привязан к аккаунту Claude: можно играть с любого телефона, где открыт этот аккаунт.' : 'Сейчас прогресс хранится только в этом браузере. Чтобы привязать его к аккаунту, открой игру по ссылке, войдя в Claude. На всякий случай сохрани код сохранения кнопкой ниже.'; }
 function encodeB64(str){ return btoa(unescape(encodeURIComponent(str))); }
 function decodeB64(str){ return decodeURIComponent(escape(atob(str))); }
 function exportCode(){ return 'LR2:'+encodeB64(JSON.stringify(snapshot())); }
@@ -855,7 +864,7 @@ addEventListener('pagehide', ()=>{ saveNow(); if(SRV.on) srvBeacon(); else cloud
 addEventListener('beforeunload', ()=>saveNow());
 
 // own server (Railway/VPS): progress tied to a player code, no accounts needed
-const SRV={on:false,id:null,code:null,busy:false,lastJson:'',lastT:0,pending:false,err:0};
+const SRV={name:null,on:false,id:null,code:null,busy:false,lastJson:'',lastT:0,pending:false,err:0};
 function getCookie(n){ const m=document.cookie.match(new RegExp('(?:^|; )'+n+'=([^;]*)')); return m?decodeURIComponent(m[1]):null; }
 function storeId(id){ try{ localStorage.setItem(KEY+'.pid',id); }catch(e){} try{ document.cookie='lrpid='+id+'; max-age=315360000; path=/; SameSite=Lax'; }catch(e){} }
 async function api(path,opt){ const r=await fetch(path,Object.assign({cache:'no-store'},opt||{})); let j=null; try{ j=await r.json(); }catch(e){} return {ok:r.ok,status:r.status,j}; }
@@ -872,7 +881,7 @@ async function srvInit(){
     if(id){ const r=await api('/api/load?id='+encodeURIComponent(id)); if(r.ok) data=r.j; else if(r.status===404) id=null; else return srvRetry(); }
     if(!id){ const r=await post('/api/new'); if(!r.ok) return srvRetry(); data=r.j; id=data.id; }
   }catch(e){ return srvRetry(); }
-  storeId(id); SRV.id=id; SRV.code=data.code; SRV.on=true;
+  storeId(id); SRV.id=id; SRV.code=data.code; SRV.name=data.name||null; SRV.on=true;
   if(applyRemote(data.save,false)) toast('Прогресс загружен ✔');
   saveNow(); await srvSave(true,true); setCloudUI(); return true; }
 async function srvSave(force,ignore){
@@ -888,11 +897,32 @@ function srvBeacon(){ if(!SRV.on || lastSaveJson===SRV.lastJson) return; try{ na
 async function srvRestore(raw){
   const code=String(raw||'').toUpperCase().replace(/[^A-Z0-9]/g,''); if(code.length!==6){ toast('В коде должно быть 6 знаков'); return; }
   try{ const r=await post('/api/restore',{code}); if(!r.ok){ toast(r.status===429?'Слишком много попыток, подожди минуту':'Такой код не найден'); return; }
-    storeId(r.j.id); SRV.id=r.j.id; SRV.code=r.j.code; SRV.on=true; SRV.lastJson='';
+    storeId(r.j.id); SRV.id=r.j.id; SRV.code=r.j.code; SRV.name=r.j.name||null; SRV.on=true; SRV.lastJson='';
     if(r.j.save) applyRemote(r.j.save,true); else { applyState(defaultState()); saveNow(); }
     $('#mMenu').hidden=true; toast('Готово! Игра продолжается с кода '+fmtCode(r.j.code)); }
   catch(e){ toast('Нет связи с сервером, попробуй ещё раз'); } }
-$('#mRestoreOpen').onclick=()=>{ $('#restoreBox').hidden=false; $('#restoreTxt').value=''; $('#restoreTxt').focus(); };
+$('#mRestoreOpen').onclick=()=>{ $('#restoreBox').hidden=false; $('#claimBox').hidden=true; $('#loginName').focus(); };
+$('#mClaimOpen').onclick=()=>{ $('#claimBox').hidden=false; $('#restoreBox').hidden=true; $('#claimName').value=SRV.name||''; $('#claimName').focus(); };
+async function srvClaim(name,pin){
+  name=String(name||'').trim(); pin=String(pin||'').trim();
+  if(name.length<2){ toast('Имя — хотя бы 2 буквы'); return false; }
+  if(!/^[0-9]{4}$/.test(pin)){ toast('Нужно ровно 4 цифры'); return false; }
+  try{ const r=await post('/api/claim',{id:SRV.id,name,pin}); if(r.ok){ SRV.name=r.j.name; try{ localStorage.setItem(KEY+'.named','1'); }catch(e){} toast('Готово! Запомни: '+SRV.name+' и '+pin); return true; }
+    toast(r.status===409?'Такое имя уже занято, придумай другое':'Не получилось, попробуй ещё раз'); }catch(e){ toast('Нет связи с сервером'); } return false; }
+$('#mClaim').onclick=async()=>{ if(await srvClaim($('#claimName').value,$('#claimPin').value)){ $('#mMenu').hidden=true; } };
+async function srvLogin(name,pin){
+  try{ const r=await post('/api/login',{name,pin}); if(!r.ok){ toast(r.status===429?'Слишком много попыток, подожди немного':'Неверное имя или цифры'); return; }
+    storeId(r.j.id); SRV.id=r.j.id; SRV.code=r.j.code; SRV.name=r.j.name||null; SRV.on=true; SRV.lastJson=''; try{ localStorage.setItem(KEY+'.named','1'); }catch(e){}
+    if(r.j.save) applyRemote(r.j.save,true); else { applyState(defaultState()); saveNow(); }
+    $('#mMenu').hidden=true; toast('С возвращением, '+SRV.name+'! 🎣'); }
+  catch(e){ toast('Нет связи с сервером, попробуй ещё раз'); } }
+$('#mLogin').onclick=()=>srvLogin($('#loginName').value,$('#loginPin').value);
+$('#nmSave').onclick=async()=>{ if(await srvClaim($('#nmName').value,$('#nmPin').value)) $('#mName').hidden=true; };
+$('#nmLater').onclick=()=>{ $('#mName').hidden=true; try{ localStorage.setItem(KEY+'.nameLater', String(purchases())); }catch(e){} };
+function checkNamePrompt(){ if(!SRV.on || SRV.name || !$('#mName').hidden || !$('#mMenu').hidden || !$('#mOffline').hidden || !$('#mWin').hidden) return;
+  let later=-1; try{ if(localStorage.getItem(KEY+'.named')) return; later=+(localStorage.getItem(KEY+'.nameLater')||-1); }catch(e){}
+  const p=purchases(); if((later<0 && p>=4) || (later>=0 && p>=later+12)){ $('#mName').hidden=false; try{ localStorage.setItem(KEY+'.nameLater', String(p)); }catch(e){} } }
+setInterval(checkNamePrompt, 3000);
 $('#mRestore').onclick=()=>srvRestore($('#restoreTxt').value);
 
 // cloud save (claude.ai account) — progress tied to the signed-in account
