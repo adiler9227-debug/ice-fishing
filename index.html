@@ -175,7 +175,7 @@ function audioInit(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAu
 const BGM={ready:false,tracks:[]};
 function bgmSetup(){ if(BGM.ready || !AC) return; BGM.ready=true;
   BGM.master=AC.createGain(); BGM.master.gain.value=1; BGM.master.connect(AC.destination);
-  for(const [src,vol] of [['/music.mp3',.25],['/wind.mp3',.85]]){ const t={vol,el:[],g:[],cur:0,on:false,x:false,unl:false,fade:2};
+  for(const [src,vol] of [['/music.mp3',.25]]){ const t={vol,el:[],g:[],cur:0,on:false,x:false,unl:false,fade:2};
     for(let i=0;i<2;i++){ const a=new Audio(); a.preload='auto'; a.src=src; const g=AC.createGain(); g.gain.value=0; try{ AC.createMediaElementSource(a).connect(g); }catch(e){} g.connect(BGM.master); t.el.push(a); t.g.push(g); }
     BGM.tracks.push(t); } }
 function bgmPlay(){ for(const t of BGM.tracks){ if(t.on) continue; const a=t.el[t.cur]; t.g[t.cur].gain.value=t.vol; a.play().then(()=>{ t.on=true; }).catch(()=>{});

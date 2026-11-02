@@ -55,7 +55,7 @@ const FILES = {
   '/': ['index.html', 'text/html; charset=utf-8'], '/index.html': ['index.html', 'text/html; charset=utf-8'],
   '/three.module.min.js': ['three.module.min.js', 'text/javascript; charset=utf-8'],
   '/manifest.json': ['manifest.json', 'application/manifest+json'], '/icon-192.png': ['icon-192.png', 'image/png'], '/icon-512.png': ['icon-512.png', 'image/png'],
-  '/music.mp3': ['music.mp3', 'audio/mpeg'], '/wind.mp3': ['wind.mp3', 'audio/mpeg'],
+  '/music.mp3': ['music.mp3', 'audio/mpeg'],
 };
 const CACHE = {};
 function getFile(name, cb) {
