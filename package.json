@@ -1,0 +1,9 @@
+{
+  "name": "ice-fishing",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Ледяная рыбалка — браузерная игра с сохранениями на сервере",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" }
+}
