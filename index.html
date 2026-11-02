@@ -25,7 +25,7 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block}
 #btns{position:fixed;top:10px;right:10px;display:flex;gap:8px;z-index:6}
 #btns button{width:46px;height:46px;border-radius:14px;border:none;background:#fff;font-size:22px;box-shadow:0 3px 0 rgba(0,0,0,.12);cursor:pointer;position:relative}
 @media (max-width:560px){ #btns{flex-direction:column;right:8px} #btns button{width:42px;height:42px;font-size:19px} }
-#bCloud.off{opacity:.45}
+#bCloud.off{}
 #bCloud.ok:after{content:"";position:absolute;right:6px;bottom:6px;width:9px;height:9px;border-radius:50%;background:#3ccf5a;border:2px solid #fff}
 #hint{position:fixed;top:104px;left:50%;transform:translateX(-50%);background:rgba(20,50,80,.8);color:#fff;font-weight:700;font-size:16px;padding:8px 16px;border-radius:999px;z-index:5;pointer-events:none;white-space:nowrap;transition:opacity .3s;opacity:0}
 #joy{position:fixed;width:120px;height:120px;margin:-60px 0 0 -60px;border-radius:50%;background:rgba(255,255,255,.28);border:3px solid rgba(255,255,255,.7);display:none;z-index:4;pointer-events:none}
@@ -51,8 +51,9 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block}
 </head>
 <body>
 <canvas id="c"></canvas>
+<canvas id="snowfx" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:3"></canvas>
 <div id="hud"><div id="money"><span class="bill"></span><span id="mval">0</span></div><div id="lvl">⭐ <span id="lvlnum">1</span><div id="lvlbar"><div id="lvlfill"></div></div></div></div>
-<div id="btns"><button id="bCloud" class="off" aria-label="Сохранение">☁️</button><button id="bSnd" aria-label="Звук">🔊</button><button id="bMenu" aria-label="Меню">⚙️</button></div>
+<div id="btns"><button id="bCloud" aria-label="Сохранить">💾</button><button id="bSnd" aria-label="Звук">🔊</button><button id="bMenu" aria-label="Меню">⚙️</button></div>
 <div id="hint"></div>
 <div id="joy"><div id="knob"></div></div>
 <div id="toast"></div>
@@ -78,6 +79,7 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block}
   <button id="mRestoreOpen" hidden>📱 Я уже играла на другом телефоне</button>
   <div id="restoreBox" hidden><input id="loginName" placeholder="Твоё имя в игре" maxlength="20" style="width:100%;padding:12px;border-radius:10px;border:2px solid #d5e2ee;font-size:19px;text-align:center;margin-top:8px"><input id="loginPin" placeholder="4 цифры" maxlength="4" inputmode="numeric" pattern="[0-9]*" style="width:100%;padding:12px;border-radius:10px;border:2px solid #d5e2ee;font-size:19px;text-align:center;margin-top:8px"><button class="go" id="mLogin">Войти</button>
     <small style="text-align:center">или по коду игрока:</small><input id="restoreTxt" placeholder="ABC-DEF" maxlength="9" style="width:100%;padding:12px;border-radius:10px;border:2px solid #d5e2ee;font-size:19px;text-align:center;margin-top:8px" style="text-transform:uppercase"><button id="mRestore">Войти по коду</button></div>
+  <button class="go" id="mSaveNow">💾 Сохранить сейчас</button>
   <button id="mSnd">Звук: вкл</button>
   <button id="mExport">Скопировать код сохранения</button>
   <button id="mImportOpen">Загрузить код сохранения</button>
@@ -168,7 +170,23 @@ function canvasTex(w,h,draw,repeat){ const cv=document.createElement('canvas'); 
 
 /* ================= sound ================= */
 let AC=null, muted=false;
-function audioInit(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(AC && AC.state==='suspended') AC.resume().catch(()=>{}); }
+function audioInit(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(AC && AC.state==='suspended') AC.resume().catch(()=>{}); try{ bgmSetup(); if(!muted) bgmPlay(); }catch(e){} }
+/* ---- background music: 2 tracks looped together, streamed (low memory), crossfaded at the loop point ---- */
+const BGM={ready:false,tracks:[]};
+function bgmSetup(){ if(BGM.ready || !AC) return; BGM.ready=true;
+  BGM.master=AC.createGain(); BGM.master.gain.value=1; BGM.master.connect(AC.destination);
+  for(const [src,vol] of [['/music.mp3',.5],['/wind.mp3',.22]]){ const t={vol,el:[],g:[],cur:0,on:false,x:false,unl:false,fade:2};
+    for(let i=0;i<2;i++){ const a=new Audio(); a.preload='auto'; a.src=src; const g=AC.createGain(); g.gain.value=0; try{ AC.createMediaElementSource(a).connect(g); }catch(e){} g.connect(BGM.master); t.el.push(a); t.g.push(g); }
+    BGM.tracks.push(t); } }
+function bgmPlay(){ for(const t of BGM.tracks){ if(t.on) continue; const a=t.el[t.cur]; t.g[t.cur].gain.value=t.vol; a.play().then(()=>{ t.on=true; }).catch(()=>{});
+    if(!t.unl){ t.unl=true; const o=t.el[1-t.cur]; o.muted=true; o.play().then(()=>{ o.pause(); o.currentTime=0; o.muted=false; }).catch(()=>{ o.muted=false; }); } } }
+function bgmPause(){ for(const t of BGM.tracks){ t.on=false; t.x=false; t.el.forEach(a=>a.pause()); } }
+function bgmTick(){ for(const t of BGM.tracks){ if(!t.on) continue; const a=t.el[t.cur], b=t.el[1-t.cur], ga=t.g[t.cur], gb=t.g[1-t.cur]; const d=a.duration;
+  if(!t.x && d && isFinite(d) && a.currentTime>d-t.fade){ t.x=true; b.currentTime=0; gb.gain.value=0; b.play().catch(()=>{}); }
+  if(t.x){ const k=Math.min(1,b.currentTime/t.fade); gb.gain.value=t.vol*k; ga.gain.value=t.vol*(1-k); if(k>=1 || a.ended){ a.pause(); a.currentTime=0; ga.gain.value=0; gb.gain.value=t.vol; t.cur=1-t.cur; t.x=false; } }
+  else if(a.ended){ a.currentTime=0; a.play().catch(()=>{}); } } }
+setInterval(bgmTick,100);
+document.addEventListener('pointerdown', ()=>audioInit(), true);
 const lastPlay = {};
 function beep(name, freqs, dur=.08, type='sine', vol=.12, gap=.06, minGap=.045){
   if(muted || !AC || AC.state!=='running') return;
@@ -279,7 +297,7 @@ const fireLight = new THREE.PointLight(0xff9a3c, 6, 9, 1.6); fireLight.position.
 const DECOR_OBS=[[0,9.5,1.0],[-12.5,9.8,.6],[13,10.5,.6],[39,10.5,.6],[65,-3,.6],[12.5,9,.6]];
 
 // snowfall
-const SNOW_N = MOBILE?400:750;
+const SNOW_N = MOBILE?220:420;
 const snowGeo = new THREE.BufferGeometry(); const snowPos = new Float32Array(SNOW_N*3);
 for(let i=0;i<SNOW_N;i++){ snowPos[i*3]=rnd(-25,25); snowPos[i*3+1]=rnd(0,18); snowPos[i*3+2]=rnd(-22,20); }
 snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPos,3));
@@ -789,11 +807,12 @@ addEventListener('resize', resize); resize();
 /* ================= UI ================= */
 function toast(t){ const el=$('#toast'); el.textContent=t; el.classList.add('show'); clearTimeout(toast.t); toast.t=setTimeout(()=>el.classList.remove('show'),2600); }
 function updateHUD(){ const m=Math.floor(S.money); if(m!==moneyShown){ moneyShown=m; $('#mval').textContent=fmt(m); } }
-function setMuted(v){ muted=v; $('#bSnd').textContent=v?'🔇':'🔊'; $('#mSnd').textContent='Звук: '+(v?'выкл':'вкл'); try{ localStorage.setItem(KEY+'.mute', v?'1':'0'); }catch(e){} }
+function setMuted(v){ muted=v; try{ if(v) bgmPause(); else if(BGM.ready) bgmPlay(); }catch(e){} $('#bSnd').textContent=v?'🔇':'🔊'; $('#mSnd').textContent='Звук: '+(v?'выкл':'вкл'); try{ localStorage.setItem(KEY+'.mute', v?'1':'0'); }catch(e){} }
 $('#bSnd').onclick=()=>{ audioInit(); setMuted(!muted); };
 $('#mSnd').onclick=()=>{ audioInit(); setMuted(!muted); };
 function openMenu(){ $('#stLvl').textContent=$('#lvlnum').textContent; $('#stEarn').textContent=fmt(S.stats.earned); $('#stSold').textContent=fmt(S.stats.sold); $('#stSave').textContent=saveStatus(); $('#saveHelp').textContent=saveHelp(); $('#importBox').hidden=true; $('#resetBox').hidden=true; $('#mExport').hidden=SRV.on; $('#mImportOpen').hidden=SRV.on; $('#codeBox').hidden=!SRV.on; $('#mRestoreOpen').hidden=!SRV.on; $('#mClaimOpen').hidden=!SRV.on; $('#mClaimOpen').textContent=SRV.name?'✏️ Сменить имя или цифры':'✏️ Придумать имя и 4 цифры'; $('#restoreBox').hidden=true; $('#claimBox').hidden=true; $('#whoLbl').textContent=SRV.name?'Ты играешь как':'Твой код игрока'; $('#pcode').textContent=SRV.name?SRV.name:fmtCode(SRV.code); $('#mMenu').hidden=false; }
-$('#bMenu').onclick=openMenu; $('#bCloud').onclick=openMenu;
+async function manualSave(){ saveNow(); if(SRV.on){ SRV.lastJson=''; await srvSave(true,true); toast(SRV.err?'⚠️ Нет связи с сервером. Сохранено на телефоне':'💾 Сохранено!'); } else toast('💾 Сохранено на этом телефоне'); }
+$('#bMenu').onclick=openMenu; $('#bCloud').onclick=manualSave; $('#mSaveNow').onclick=()=>{ manualSave(); };
 $('#mClose').onclick=()=>{ $('#mMenu').hidden=true; };
 $('#mReset').onclick=()=>{ $('#resetBox').hidden=false; };
 $('#mResetYes').onclick=()=>{ applyState(defaultState()); saveNow(); cloudSave(true,true); $('#mMenu').hidden=true; toast('Новая игра началась!'); };
@@ -859,7 +878,7 @@ function offlineReward(sec){ if(!(sec>60)) return 0; sec=Math.min(sec,2*3600); c
   let rate=nh/catchTime()*avg*.12; const nb=SHOPS.filter(s=>has('b'+s.id)).length; if(!nb) rate*=.5; const cap=50+S.stats.earned*.3; return Math.floor(Math.min(sec*rate,cap)); }
 function showOffline(v){ if(v<10) return; pendingOffline+=v; $('#offAmt').textContent='+'+fmt(pendingOffline); $('#mOffline').hidden=false; }
 let hiddenAt=0;
-document.addEventListener('visibilitychange', ()=>{ if(document.hidden){ hiddenAt=Date.now(); saveNow(); if(SRV.on) srvBeacon(); else cloudSave(true); } else if(hiddenAt){ const sec=(Date.now()-hiddenAt)/1000; hiddenAt=0; showOffline(offlineReward(sec)); last=performance.now(); } });
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden){ try{ bgmPause(); }catch(e){} hiddenAt=Date.now(); saveNow(); if(SRV.on) srvBeacon(); else cloudSave(true); } else if(hiddenAt){ try{ if(!muted && BGM.ready) bgmPlay(); }catch(e){} const sec=(Date.now()-hiddenAt)/1000; hiddenAt=0; showOffline(offlineReward(sec)); last=performance.now(); } });
 addEventListener('pagehide', ()=>{ saveNow(); if(SRV.on) srvBeacon(); else cloudSave(true); });
 addEventListener('beforeunload', ()=>saveNow());
 
@@ -886,7 +905,7 @@ async function srvInit(){
   saveNow(); await srvSave(true,true); setCloudUI(); return true; }
 async function srvSave(force,ignore){
   if(!SRV.on) return; if(SRV.busy){ SRV.pending=true; return; } const now=Date.now();
-  if(!ignore && now-SRV.lastT<(force?3000:10000)){ if(force) SRV.pending=true; return; }
+  if(!ignore && now-SRV.lastT<(force?3000:90000)){ if(force) SRV.pending=true; return; }
   if(lastSaveJson===SRV.lastJson) return;
   SRV.busy=true; SRV.pending=false; const json=lastSaveJson;
   try{ const r=await post('/api/save',{id:SRV.id,save:json}); if(r.ok){ SRV.lastJson=json; SRV.lastT=now; SRV.err=0; }
@@ -964,7 +983,15 @@ function update(dt){
   const sp=snow.geometry.attributes.position.array; for(let i=0;i<SNOW_N;i++){ sp[i*3+1]-=dt*(1+(i%5)*.15); sp[i*3]+=Math.sin(time+i)*dt*.3; if(sp[i*3+1]<0){ sp[i*3+1]=18; sp[i*3]=camT.x+rnd(-25,25); sp[i*3+2]=camT.z+rnd(-22,20); } } snow.geometry.attributes.position.needsUpdate=true;
   if(bigTree.visible) bigTree.userData.star.rotation.y+=dt*1.5;
   saveT+=dt; if(saveT>3){ saveT=0; saveNow(); cloudSave(cloudPending); setCloudUI(); } }
-function frame(now){ requestAnimationFrame(frame); let dt=(now-last)/1000; last=now; if(!(dt>0)) dt=0; if(dt>.1) dt=.1; try{ update(dt); }catch(e){ console.error(e); } renderer.render(scene,camera); }
+const snowCv=$('#snowfx'), sctx=snowCv.getContext('2d'); let flakes=[], snowAcc=0;
+function newFlake(any){ return {x:Math.random()*innerWidth, y:any?Math.random()*innerHeight:-8, r:rnd(1.2,2.8), vy:rnd(16,42), sw:rnd(.5,1.4), ph:rnd(0,7), a:rnd(.3,.7)}; }
+function snowResize(){ const d=Math.min(devicePixelRatio,2); snowCv.width=Math.round(innerWidth*d); snowCv.height=Math.round(innerHeight*d); sctx.setTransform(d,0,0,d,0,0); const n=Math.round(clamp(innerWidth*innerHeight/15000,20,70)); flakes=Array.from({length:n},()=>newFlake(true)); }
+function drawSnow(dt){ snowAcc+=dt; if(snowAcc<1/30) return; const st=Math.min(snowAcc,.1); snowAcc=0; sctx.clearRect(0,0,innerWidth,innerHeight);
+  for(const f of flakes){ f.y+=f.vy*st; f.ph+=st*f.sw; f.x+=Math.sin(f.ph)*10*st; if(f.y>innerHeight+6) Object.assign(f,newFlake(false));
+    sctx.globalAlpha=f.a*.35; sctx.fillStyle='#8fb3d1'; sctx.beginPath(); sctx.arc(f.x,f.y,f.r+1.1,0,7); sctx.fill(); sctx.globalAlpha=f.a+.2; sctx.fillStyle='#ffffff'; sctx.beginPath(); sctx.arc(f.x,f.y,f.r,0,7); sctx.fill(); }
+  sctx.globalAlpha=1; }
+snowResize(); addEventListener('resize', snowResize);
+function frame(now){ requestAnimationFrame(frame); let dt=(now-last)/1000; last=now; if(!(dt>0)) dt=0; if(dt>.1) dt=.1; try{ update(dt); drawSnow(dt); }catch(e){ console.error(e); } renderer.render(scene,camera); }
 
 /* ================= boot ================= */
 try{ muted = localStorage.getItem(KEY+'.mute')==='1' || localStorage.getItem(OLDKEY+'.mute')==='1'; }catch(e){}
@@ -982,7 +1009,7 @@ requestAnimationFrame(frame);
 cloudInit();
 if(!loaded && !migrated) setTimeout(()=>toast('Води пальцем по экрану, чтобы ходить'),600);
 
-window.__g = { SRV, renderer, S, C, shops, holes, SHOPS, pos, TILES, update, saveNow, snapshot, applyState, sanitize, exportCode, importCode, debugInput, setPos:(x,z)=>{pos.set(x,0,z);}, tileNext, KEY, gift, purchases, beltItems };
+window.__g = { BGM, SRV, renderer, S, C, shops, holes, SHOPS, pos, TILES, update, saveNow, snapshot, applyState, sanitize, exportCode, importCode, debugInput, setPos:(x,z)=>{pos.set(x,0,z);}, tileNext, KEY, gift, purchases, beltItems };
 </script>
 </body>
 </html>

@@ -55,6 +55,7 @@ const FILES = {
   '/': ['index.html', 'text/html; charset=utf-8'], '/index.html': ['index.html', 'text/html; charset=utf-8'],
   '/three.module.min.js': ['three.module.min.js', 'text/javascript; charset=utf-8'],
   '/manifest.json': ['manifest.json', 'application/manifest+json'], '/icon-192.png': ['icon-192.png', 'image/png'], '/icon-512.png': ['icon-512.png', 'image/png'],
+  '/music.mp3': ['music.mp3', 'audio/mpeg'], '/wind.mp3': ['wind.mp3', 'audio/mpeg'],
 };
 const CACHE = {};
 function getFile(name, cb) {
@@ -131,6 +132,17 @@ const server = http.createServer((q, r) => {
   const f = FILES[p]; if (!f) { r.writeHead(404); return r.end('not found'); }
   getFile(f[0], (e, c) => {
     if (e) { r.writeHead(404); return r.end('not found'); }
+    // Звук: поддержка Range (без этого Safari на iPhone не играет аудио)
+    if (f[1] === 'audio/mpeg') {
+      const total = c.d.length, m = /bytes=(\d*)-(\d*)/.exec(q.headers.range || '');
+      const base = { 'Content-Type': f[1], 'Accept-Ranges': 'bytes', 'Cache-Control': 'public, max-age=86400', ETag: c.etag };
+      if (m) {
+        let start = m[1] === '' ? Math.max(0, total - (+m[2] || 0)) : +m[1], end = m[1] !== '' && m[2] !== '' ? Math.min(+m[2], total - 1) : total - 1;
+        if (start >= total || start > end) { r.writeHead(416, { 'Content-Range': 'bytes */' + total }); return r.end(); }
+        r.writeHead(206, { ...base, 'Content-Range': `bytes ${start}-${end}/${total}`, 'Content-Length': end - start + 1 }); return r.end(c.d.subarray(start, end + 1));
+      }
+      r.writeHead(200, { ...base, 'Content-Length': total }); return r.end(c.d);
+    }
     if (q.headers['if-none-match'] === c.etag) { r.writeHead(304, { ETag: c.etag, 'Cache-Control': 'no-cache' }); return r.end(); }
     const gz = c.gz && /\bgzip\b/.test(q.headers['accept-encoding'] || ''), body = gz ? c.gz : c.d;
     const h = { 'Content-Type': f[1], 'Cache-Control': 'no-cache', ETag: c.etag, 'Content-Length': body.length, Vary: 'Accept-Encoding' }; if (gz) h['Content-Encoding'] = 'gzip';
