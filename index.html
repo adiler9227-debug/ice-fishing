@@ -171,22 +171,24 @@ function canvasTex(w,h,draw,repeat){ const cv=document.createElement('canvas'); 
 /* ================= sound ================= */
 let AC=null, muted=false;
 function audioInit(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(AC && AC.state==='suspended') AC.resume().catch(()=>{}); try{ bgmSetup(); if(!muted) bgmPlay(); }catch(e){} }
-/* ---- background music: 2 tracks looped together, streamed (low memory), crossfaded at the loop point ---- */
-const BGM={ready:false,tracks:[]};
-function bgmSetup(){ if(BGM.ready || !AC) return; BGM.ready=true;
-  BGM.master=AC.createGain(); BGM.master.gain.value=1; BGM.master.connect(AC.destination);
-  for(const [src,vol] of [['/music.mp3',.25]]){ const t={vol,el:[],g:[],cur:0,on:false,x:false,unl:false,fade:2};
-    for(let i=0;i<2;i++){ const a=new Audio(); a.preload='auto'; a.src=src; const g=AC.createGain(); g.gain.value=0; try{ AC.createMediaElementSource(a).connect(g); }catch(e){} g.connect(BGM.master); t.el.push(a); t.g.push(g); }
+/* ---- background music: looped, plain HTML audio (works on iPhone even in silent mode), crossfade where volume is adjustable ---- */
+const BGM={ready:false,tracks:[],locked:false};
+function bgmSetup(){ if(BGM.ready) return; BGM.ready=true;
+  try{ if(navigator.audioSession) navigator.audioSession.type='playback'; }catch(e){}
+  const probe=new Audio(); try{ probe.volume=.5; }catch(e){} BGM.locked = Math.abs(probe.volume-.5)>.01; // iPhone: volume can't be changed by the page
+  for(const [src,vol] of [['/music.mp3',.6]]){ const t={vol,el:[],cur:0,on:false,x:false,unl:false,fade:2};
+    for(let i=0;i<(BGM.locked?1:2);i++){ const a=new Audio(); a.preload='auto'; a.src=src; a.setAttribute('playsinline',''); if(BGM.locked) a.loop=true; else a.volume=vol; t.el.push(a); }
     BGM.tracks.push(t); } }
-function bgmPlay(){ for(const t of BGM.tracks){ if(t.on) continue; const a=t.el[t.cur]; t.g[t.cur].gain.value=t.vol; a.play().then(()=>{ t.on=true; }).catch(()=>{});
-    if(!t.unl){ t.unl=true; const o=t.el[1-t.cur]; o.muted=true; o.play().then(()=>{ o.pause(); o.currentTime=0; o.muted=false; }).catch(()=>{ o.muted=false; }); } } }
-function bgmPause(){ for(const t of BGM.tracks){ t.on=false; t.x=false; t.el.forEach(a=>a.pause()); } }
-function bgmTick(){ for(const t of BGM.tracks){ if(!t.on) continue; const a=t.el[t.cur], b=t.el[1-t.cur], ga=t.g[t.cur], gb=t.g[1-t.cur]; const d=a.duration;
-  if(!t.x && d && isFinite(d) && a.currentTime>d-t.fade){ t.x=true; b.currentTime=0; gb.gain.value=0; b.play().catch(()=>{}); }
-  if(t.x){ const k=Math.min(1,b.currentTime/t.fade); gb.gain.value=t.vol*k; ga.gain.value=t.vol*(1-k); if(k>=1 || a.ended){ a.pause(); a.currentTime=0; ga.gain.value=0; gb.gain.value=t.vol; t.cur=1-t.cur; t.x=false; } }
+function bgmPlay(){ for(const t of BGM.tracks){ if(t.on) continue; const a=t.el[t.cur]; if(!BGM.locked) a.volume=t.vol;
+    try{ const pr=a.play(); if(pr && pr.then) pr.then(()=>{ t.on=true; }).catch(()=>{}); else t.on=true; }catch(e){}
+    if(!t.unl && t.el.length>1){ t.unl=true; const o=t.el[1-t.cur]; o.muted=true; try{ o.play().then(()=>{ o.pause(); o.currentTime=0; o.muted=false; }).catch(()=>{ o.muted=false; }); }catch(e){ o.muted=false; } } } }
+function bgmPause(){ for(const t of BGM.tracks){ t.on=false; t.x=false; t.el.forEach(a=>{ try{ a.pause(); }catch(e){} }); } }
+function bgmTick(){ for(const t of BGM.tracks){ if(!t.on || t.el.length<2) continue; const a=t.el[t.cur], b=t.el[1-t.cur]; const d=a.duration;
+  if(!t.x && d && isFinite(d) && a.currentTime>d-t.fade){ t.x=true; b.currentTime=0; b.volume=0; b.play().catch(()=>{}); }
+  if(t.x){ const k=Math.min(1,b.currentTime/t.fade); b.volume=t.vol*k; a.volume=t.vol*(1-k); if(k>=1 || a.ended){ a.pause(); a.currentTime=0; b.volume=t.vol; t.cur=1-t.cur; t.x=false; } }
   else if(a.ended){ a.currentTime=0; a.play().catch(()=>{}); } } }
 setInterval(bgmTick,100);
-document.addEventListener('pointerdown', ()=>audioInit(), true);
+for(const ev of ['pointerdown','pointerup','touchend','click','keydown']) document.addEventListener(ev, ()=>audioInit(), true);
 const lastPlay = {};
 function beep(name, freqs, dur=.08, type='sine', vol=.12, gap=.06, minGap=.045){
   if(muted || !AC || AC.state!=='running') return;
